@@ -5,9 +5,10 @@ import { Framework } from '@vechain/connex-framework'
 import { Driver, SimpleNet, SimpleWallet } from '@vechain/connex-driver'
 
 import { soloAccounts } from 'myvetools/dist/builtin'
-import { compileContract, getABI } from 'myvetools/dist/utils'
+import { compileContract } from 'myvetools/dist/utils'
 import { Contract } from 'myvetools/dist/contract'
-import { getReceipt, decodeEvent } from 'myvetools/dist/connexUtils'
+import { getReceipt } from 'myvetools/dist/connexUtils'
+import { numToHexStr } from 'myvetools/dist/utils'
 
 describe('Test TestToken contract', () => {
 	const wallet = new SimpleWallet()
@@ -37,12 +38,12 @@ describe('Test TestToken contract', () => {
 	let txRep: Connex.Vendor.TxResponse
 	let callOut: Connex.VM.Output & Connex.Thor.Account.WithDecoded
 
-	const c = new Contract({ 
+	const c = new Contract({
 		abi: JSON.parse(compileContract(
-			path.resolve(process.cwd(), './contracts/test-token.sol'), 
-			'TestToken', 'abi')), 
+			path.resolve(process.cwd(), './contracts/test-token.sol'),
+			'TestToken', 'abi')),
 		bytecode: compileContract(
-			path.resolve(process.cwd(), './contracts/test-token.sol'), 
+			path.resolve(process.cwd(), './contracts/test-token.sol'),
 			'TestToken', 'bytecode')
 	})
 
@@ -56,10 +57,28 @@ describe('Test TestToken contract', () => {
 		}
 	})
 
-	it('check', async () => {
+	it('transfer', async () => {
 		c.connex(connex)
 		callOut = await c.call('symbol')
 		expect(callOut.decoded['0']).to.eql('TT')
+
+		callOut = await c.call('balanceOf', wallet.list[0].address)
+		expect(callOut.decoded['0']).to.eql('1' + '0'.repeat(18 + 4))
+
+		const clause = c.send(
+			'transfer', 
+			0, 
+			wallet.list[1].address, 
+			numToHexStr(100 * 10 ** 18)
+		)
+		txRep = await connex.vendor.sign('tx', [clause])
+			.signer(wallet.list[0].address)
+			.request()
+		receipt = await getReceipt(connex, 5, txRep.txid)
+		expect(receipt.reverted).to.eql(false)
+
+		callOut = await c.call('balanceOf', wallet.list[1].address)
+		expect(callOut.decoded['0']).to.eql('1' + '0'.repeat(2 + 18))
 	})
 })
 
