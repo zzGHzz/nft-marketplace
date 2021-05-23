@@ -1,1 +1,2 @@
-# nft-marketplace
+# Smart Contracts Developed for NFT Marketplace
+
