@@ -40,10 +40,10 @@ describe('Test TestToken contract', () => {
 
 	const c = new Contract({
 		abi: JSON.parse(compileContract(
-			path.resolve(process.cwd(), './contracts/test-token.sol'),
+			path.resolve(process.cwd(), './contracts/ft.sol'),
 			'TestToken', 'abi')),
 		bytecode: compileContract(
-			path.resolve(process.cwd(), './contracts/test-token.sol'),
+			path.resolve(process.cwd(), './contracts/ft.sol'),
 			'TestToken', 'bytecode')
 	})
 
@@ -55,16 +55,16 @@ describe('Test TestToken contract', () => {
 		if (receipt.outputs[0].contractAddress) {
 			c.at(receipt.outputs[0].contractAddress)
 		}
-	})
 
-	it('transfer', async () => {
 		c.connex(connex)
 		callOut = await c.call('symbol')
 		expect(callOut.decoded['0']).to.eql('TT')
 
 		callOut = await c.call('balanceOf', wallet.list[0].address)
 		expect(callOut.decoded['0']).to.eql('1' + '0'.repeat(18 + 4))
+	})
 
+	it('transfer', async () => {
 		const clause = c.send(
 			'transfer', 
 			0, 
