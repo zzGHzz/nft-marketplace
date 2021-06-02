@@ -18,8 +18,6 @@ contract TestNFT721 is ERC721, AccessControlEnumerable {
             hasRole(MINTER_ROLE, msg.sender),
             "Must have minter role to mint"
         );
-        require(!_exists(id), "Token ID already exists");
-
         _mint(to, id);
     }
 
