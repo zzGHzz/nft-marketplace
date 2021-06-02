@@ -8,9 +8,8 @@ import { soloAccounts } from 'myvetools/dist/builtin'
 import { compileContract, getABI } from 'myvetools/dist/utils'
 import { Contract } from 'myvetools/dist/contract'
 import { getReceipt, decodeEvent } from 'myvetools/dist/connexUtils'
-import { strToHexStr } from 'myvetools/dist/utils'
 
-describe('Test TestNFT contract', () => {
+describe('Test contract TestNFT1155', () => {
 	const wallet = new SimpleWallet()
 	// Add private keys
 	soloAccounts.forEach(val => { wallet.import(val) })
@@ -40,11 +39,11 @@ describe('Test TestNFT contract', () => {
 
 	const c = new Contract({
 		abi: JSON.parse(compileContract(
-			path.resolve(process.cwd(), './contracts/nft.sol'),
-			'TestNFT', 'abi')),
+			path.resolve(process.cwd(), './contracts/nft-1155.sol'),
+			'TestNFT1155', 'abi')),
 		bytecode: compileContract(
-			path.resolve(process.cwd(), './contracts/nft.sol'),
-			'TestNFT', 'bytecode')
+			path.resolve(process.cwd(), './contracts/nft-1155.sol'),
+			'TestNFT1155', 'bytecode')
 	})
 
 	it('deploy', async () => {
@@ -116,36 +115,3 @@ describe('Test TestNFT contract', () => {
 		expect(parseInt(callOut.decoded['0'])).to.eql(20)
 	})
 })
-
-/**
- * 	// Initiate a Contract instance
- * 	const abi = JSON.parse(compileContract('path/to/file', 'contract-name', 'abi'))
- * 	const bin = compileContract('path/to/file', 'contract-name', 'bytecode')
- * 	const c = new Contract({abi: abi, bytecode: bin, connex: connex})
- *
- * 	// construct a clause for contract deployment
- * 	const clause = c.deploy(value, ...params)
- *
- * 	// Send a transaction
- * 	txRep = await connex.vendor.sign('tx', [clause1, clause2, ...])
- * 			.signer(sender)
- * 			.request()
- *
- * 	// Get receipt and check success of the tx execution
- * 	receipt = await getReceipt(connex, timeoutInBlock, txRep.txid)
- * 	expect(receipt.reverted).to.equal(false)
- *
- * 	// Get the contract address and set it to the contract instance
- * 	if (receipt.outputs[0].contractAddress !== null) {
- * 		c.at(receipt.outputs[0].contractAddress)
- * 	}
- *
- *  // Get event info
- * 	const decoded = decodeEvent(
- * 		receipt.outputs[clauseIndex].events[eventIndex],
- * 		getABI(abi, 'EventName', 'event')
- * 	)
- *
- * 	// Call contract function locally
- *  callOut = await c.call('funcName', ...params)
- */
