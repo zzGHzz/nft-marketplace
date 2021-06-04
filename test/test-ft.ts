@@ -35,7 +35,7 @@ describe('Test TestToken contract', () => {
 	})
 
 	let receipt: Connex.Thor.Transaction.Receipt
-	let txRep: Connex.Vendor.TxResponse
+	let txResp: Connex.Vendor.TxResponse
 	let callOut: Connex.VM.Output & Connex.Thor.Account.WithDecoded
 
 	const c = new Contract({
@@ -48,9 +48,9 @@ describe('Test TestToken contract', () => {
 	})
 
 	it('deploy', async () => {
-		const clause = c.deploy(0)
-		txRep = await connex.vendor.sign('tx', [clause]).signer(wallet.list[0].address).request()
-		receipt = await getReceipt(connex, 5, txRep.txid)
+		const clause = c.deploy(0, 10000)
+		txResp = await connex.vendor.sign('tx', [clause]).signer(wallet.list[0].address).request()
+		receipt = await getReceipt(connex, 5, txResp.txid)
 		expect(receipt.reverted).to.eql(false)
 		if (receipt.outputs[0].contractAddress) {
 			c.at(receipt.outputs[0].contractAddress)
@@ -71,10 +71,10 @@ describe('Test TestToken contract', () => {
 			wallet.list[1].address, 
 			numToHexStr(100 * 10 ** 18)
 		)
-		txRep = await connex.vendor.sign('tx', [clause])
+		txResp = await connex.vendor.sign('tx', [clause])
 			.signer(wallet.list[0].address)
 			.request()
-		receipt = await getReceipt(connex, 5, txRep.txid)
+		receipt = await getReceipt(connex, 5, txResp.txid)
 		expect(receipt.reverted).to.eql(false)
 
 		callOut = await c.call('balanceOf', wallet.list[1].address)
@@ -92,12 +92,12 @@ describe('Test TestToken contract', () => {
  * 	const clause = c.deploy(value, ...params)
  *
  * 	// Send a transaction
- * 	txRep = await connex.vendor.sign('tx', [clause1, clause2, ...])
+ * 	txResp = await connex.vendor.sign('tx', [clause1, clause2, ...])
  * 			.signer(sender)
  * 			.request()
  *
  * 	// Get receipt and check success of the tx execution
- * 	receipt = await getReceipt(connex, timeoutInBlock, txRep.txid)
+ * 	receipt = await getReceipt(connex, timeoutInBlock, txResp.txid)
  * 	expect(receipt.reverted).to.equal(false)
  *
  * 	// Get the contract address and set it to the contract instance
