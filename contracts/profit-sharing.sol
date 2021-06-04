@@ -4,7 +4,9 @@
 pragma solidity ^0.8.0;
 
 contract ProfitSharing {
-    // Owner of the contract who is allowed to add/update profit sharing rules
+	uint256 private _decimal = 4;
+
+	// Owner of the contract who is allowed to add/update profit sharing rules
     address public owner;
     modifier isOwner {
         require(
@@ -26,14 +28,14 @@ contract ProfitSharing {
     /**
      * @dev Add or update profit sharing rules for NFT tokens
      * @param nftAddr [address] NFT contract address
-     * @param id [uint256] NFT token ID
+     * @param tokenId [uint256] NFT token ID
      * @param beneficiary [addresss[]]
      * @param pct [uint256[] decimal = 4] Percentages of each trading amount going to the benefiaries.
      * @return [bool] Success or reverted
      */
     function addOrUpdate(
         address nftAddr,
-        uint256 id,
+        uint256 tokenId,
         address[] memory beneficiary,
         uint256[] memory pct
     ) public isOwner returns (bool) {
@@ -41,23 +43,23 @@ contract ProfitSharing {
         require(beneficiary.length > 0, "No beneficiary");
         require(
             beneficiary.length == pct.length,
-            "Length of the beneficiary array must be equal to that of the pct array"
+            "beneficiary.length != pct.length"
         );
 
-        uint256 MAX = 1000000; // 100%
+        uint256 MAX = 100 * 10**_decimal; // 100%
         uint256 sum = 0;
         for (uint256 i = 0; i < pct.length; i++) {
-            require(pct[i] <= MAX, "Percentage larger than 100%");
+            require(pct[i] > 0 && pct[i] <= MAX, "Percentage outside of (0, 1)");
             require(beneficiary[i] != address(0), "Zero beneficiary address");
             sum += pct[i];
         }
         require(sum <= MAX, "Total percentage larger than 100%");
 
-        bytes32 index = sha256(abi.encode(nftAddr, id));
+        bytes32 index = _index(nftAddr, tokenId);
         _beneficiary[index] = beneficiary;
         _pct[index] = pct;
 
-        emit AddOrUpdate(nftAddr, id, beneficiary, pct);
+        emit AddOrUpdate(nftAddr, tokenId, beneficiary, pct);
 
         return true;
     }
@@ -73,14 +75,14 @@ contract ProfitSharing {
      * @dev Calculate the shared amount according the stored rule
      * @param value [uint256] Trading amount
      * @param nftAddr [address] NFT contract address
-     * @param id [uint256] NFT token ID
+     * @param tokenId [uint256] NFT token ID
      * @return beneficiary [address[]]
      * @return amount [uint256[]]
      */
     function cal(
         uint256 value,
         address nftAddr,
-        uint256 id
+        uint256 tokenId
     )
         public
         view
@@ -88,7 +90,7 @@ contract ProfitSharing {
     {
         require(nftAddr != address(0), "Zero NFT contract address");
 
-        bytes32 index = sha256(abi.encode(nftAddr, id));
+        bytes32 index = _index(nftAddr, tokenId);
         beneficiary = _beneficiary[index];
 
         if (beneficiary.length == 0) {
@@ -96,9 +98,17 @@ contract ProfitSharing {
         }
 
         amount = new uint256[](beneficiary.length);
-        uint256 MAX = 1000000;
+        uint256 MAX = 100 * 10**_decimal;
         for (uint256 i = 0; i < beneficiary.length; i++) {
             amount[i] = (value * _pct[index][i]) / MAX;
         }
     }
+
+	function _index(address nftAddr, uint256 tokenId) internal pure returns (bytes32) {
+		return sha256(abi.encode(nftAddr, tokenId));
+	}
+
+	function decimal() public view returns (uint256) {
+		return _decimal;
+	}
 }

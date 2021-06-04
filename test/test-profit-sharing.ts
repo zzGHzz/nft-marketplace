@@ -35,7 +35,7 @@ describe('Test contract ProfitSharing', () => {
 	})
 
 	let receipt: Connex.Thor.Transaction.Receipt
-	let txRep: Connex.Vendor.TxResponse
+	let txResp: Connex.Vendor.TxResponse
 	let callOut: Connex.VM.Output & Connex.Thor.Account.WithDecoded
 
 	const c = new Contract({
@@ -58,10 +58,10 @@ describe('Test contract ProfitSharing', () => {
 	it('deploy', async () => {
 		c.connex(connex)
 		const clause = c.deploy(0)
-		txRep = await connex.vendor.sign('tx', [clause])
+		txResp = await connex.vendor.sign('tx', [clause])
 			.signer(owner)
 			.request()
-		receipt = await getReceipt(connex, 5, txRep.txid)
+		receipt = await getReceipt(connex, 5, txResp.txid)
 		expect(receipt.reverted).to.eql(false)
 
 		if (receipt.outputs[0].contractAddress !== null) {
@@ -70,54 +70,40 @@ describe('Test contract ProfitSharing', () => {
 	})
 
 	describe('Test addOrUpdate', () => {
-		it('not owner', async () => {
-			const sender = wallet.list[1].address
-			const clause = c.send('addOrUpdate', 0, nftAddr, id, beneficiary, pct)
+		it('requirement check', async () => {
+			const txs = [
+				[c.send('addOrUpdate', 0, nftAddr, id, beneficiary, pct)],
+				[c.send('addOrUpdate', 0, zeroAddr, id, beneficiary, pct)],
+				[c.send('addOrUpdate', 0, nftAddr, id, [], pct)],
+				[c.send('addOrUpdate', 0, nftAddr, id, beneficiary, pct.slice(1))],
+				[c.send('addOrUpdate', 0, nftAddr, id, beneficiary, [10000001, 1, 1])],
+				[c.send('addOrUpdate', 0, nftAddr, id, beneficiary, [100000, 0, 1])],
+				[c.send('addOrUpdate', 0, nftAddr, id, beneficiary, [500000, 500000, 1])]
+			]
+			const callers = [wallet.list[1].address, owner, owner, owner, owner, owner, owner]
+			const errs = [
+				'Account not permitted',
+				'Zero NFT contract address',
+				'No beneficiary',
+				'beneficiary.length != pct.length',
+				'Percentage outside of (0, 1)',
+				'Percentage outside of (0, 1)',
+				'Total percentage larger than 100%'
+			]
 
-			txRep = await connex.vendor.sign('tx', [clause])
-				.signer(sender)
-				.request()
-			receipt = await getReceipt(connex, 5, txRep.txid)
-			expect(receipt.reverted).to.eql(true)
-		})
-
-		it('zero nftAddr', async () => {
-			const clause = c.send('addOrUpdate', 0, zeroAddr, id, beneficiary, pct)
-
-			txRep = await connex.vendor.sign('tx', [clause])
-				.signer(owner)
-				.request()
-			receipt = await getReceipt(connex, 5, txRep.txid)
-			expect(receipt.reverted).to.eql(true)
-		})
-
-		it('no beneficiary', async () => {
-			const clause = c.send('addOrUpdate', 0, nftAddr, id, [], pct)
-
-			txRep = await connex.vendor.sign('tx', [clause])
-				.signer(owner)
-				.request()
-			receipt = await getReceipt(connex, 5, txRep.txid)
-			expect(receipt.reverted).to.eql(true)
-		})
-
-		it('beneficiary.length != pct.length', async () => {
-			const clause = c.send('addOrUpdate', 0, nftAddr, id, beneficiary, pct.slice(1))
-
-			txRep = await connex.vendor.sign('tx', [clause])
-				.signer(owner)
-				.request()
-			receipt = await getReceipt(connex, 5, txRep.txid)
-			expect(receipt.reverted).to.eql(true)
+			for(let i = 0; i<txs.length;i++) {
+				const dryRunOut = await connex.thor.explain(txs[i]).caller(callers[i]).execute()
+				expect(dryRunOut[0].revertReason).to.eql(errs[i])
+			}
 		})
 
 		it('add a profit sharing rule', async () => {
 			const clause = c.send('addOrUpdate', 0, nftAddr, id, beneficiary, pct)
 
-			txRep = await connex.vendor.sign('tx', [clause])
+			txResp = await connex.vendor.sign('tx', [clause])
 				.signer(owner)
 				.request()
-			receipt = await getReceipt(connex, 5, txRep.txid)
+			receipt = await getReceipt(connex, 5, txResp.txid)
 			expect(receipt.reverted).to.eql(false)
 
 			const abi = JSON.parse(compileContract(
@@ -128,7 +114,7 @@ describe('Test contract ProfitSharing', () => {
 			expect(decoded['nftAddr']).to.eql(nftAddr)
 			expect(parseInt(decoded['id'], 10)).to.eql(id)
 
-			for (let i = 0; i < 3; i++) {
+			for (let i = 0; i < beneficiary.length; i++) {
 				expect(decoded['beneficiary'][i]).to.eql(beneficiary[i])
 				expect(parseInt(decoded['pct'][i], 10)).to.eql(pct[i])
 			}
@@ -146,9 +132,9 @@ describe('Test contract ProfitSharing', () => {
 		})
 		it('check results', async () => {
 			callOut = await c.call('cal', value, nftAddr, id)
-			for (let i = 0; i < 3; i++) {
+			for (let i = 0; i < beneficiary.length; i++) {
 				expect(callOut.decoded['0'][i]).to.eql(beneficiary[i])
-				expect(parseInt(callOut.decoded['1'][i])).to.eql(pct[i] * value / 1000000)
+				expect(parseInt(callOut.decoded['1'][i])).to.eql(pct[i] * value / (100 * 1e4))
 			}
 		})
 	})
@@ -157,66 +143,3 @@ describe('Test contract ProfitSharing', () => {
 function genRandAddress(): string {
 	return lPadHex('0x' + crypto.randomBytes(20).toString('hex'), 40)
 }
-
-// it('zero seller', async () => {
-		// 	const clause = c.send('addOrUpdate', 0, zeroAddr, buyer, nftAddr, id, beneficiary, pct)
-
-		// 	txRep = await connex.vendor.sign('tx', [clause])
-		// 		.signer(owner)
-		// 		.request()
-		// 	receipt = await getReceipt(connex, 5, txRep.txid)
-		// 	expect(receipt.reverted).to.eql(true)
-		// })
-
-		// it('zero buyer', async () => {
-		// 	const clause = c.send('addOrUpdate', 0, seller, zeroAddr, nftAddr, id, beneficiary, pct)
-
-		// 	txRep = await connex.vendor.sign('tx', [clause])
-		// 		.signer(owner)
-		// 		.request()
-		// 	receipt = await getReceipt(connex, 5, txRep.txid)
-		// 	expect(receipt.reverted).to.eql(true)
-		// })
-
-		// it('buyer == seller', async () => {
-		// 	const clause = c.send('addOrUpdate', 0, seller, seller, nftAddr, id, beneficiary, pct)
-
-		// 	txRep = await connex.vendor.sign('tx', [clause])
-		// 		.signer(owner)
-		// 		.request()
-		// 	receipt = await getReceipt(connex, 5, txRep.txid)
-		// 	expect(receipt.reverted).to.eql(true)
-		// })
-
-/**
- * 	// Initiate a Contract instance
- * 	const abi = JSON.parse(compileContract('path/to/file', 'contract-name', 'abi'))
- * 	const bin = compileContract('path/to/file', 'contract-name', 'bytecode')
- * 	const c = new Contract({abi: abi, bytecode: bin, connex: connex})
- *
- * 	// construct a clause for contract deployment
- * 	const clause = c.deploy(value, ...params)
- *
- * 	// Send a transaction
- * 	txRep = await connex.vendor.sign('tx', [clause1, clause2, ...])
- * 			.signer(sender)
- * 			.request()
- *
- * 	// Get receipt and check success of the tx execution
- * 	receipt = await getReceipt(connex, timeoutInBlock, txRep.txid)
- * 	expect(receipt.reverted).to.equal(false)
- *
- * 	// Get the contract address and set it to the contract instance
- * 	if (receipt.outputs[0].contractAddress !== null) {
- * 		c.at(receipt.outputs[0].contractAddress)
- * 	}
- *
- *  // Get event info
- * 	const decoded = decodeEvent(
- * 		receipt.outputs[clauseIndex].events[eventIndex],
- * 		getABI(abi, 'EventName', 'event')
- * 	)
- *
- * 	// Call contract function locally
- *  callOut = await c.call('funcName', ...params)
- */
